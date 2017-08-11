@@ -2247,6 +2247,7 @@
 				"VALID_ARCHS[sdk=iphonesimulator*]" = "$(BIT_SIM_ARCHS)";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
+				VERSION_STRING = 5.0.1;
 			};
 			name = ReleaseCrashOnlyExtensions;
 		};
@@ -2769,6 +2770,7 @@
 				"VALID_ARCHS[sdk=iphonesimulator*]" = "$(BIT_SIM_ARCHS)";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
+				VERSION_STRING = 5.0.1;
 			};
 			name = Debug;
 		};
@@ -2819,6 +2821,7 @@
 				"VALID_ARCHS[sdk=iphonesimulator*]" = "$(BIT_SIM_ARCHS)";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
+				VERSION_STRING = 5.0.1;
 			};
 			name = ReleaseDefault;
 		};
@@ -2869,6 +2872,7 @@
 				"VALID_ARCHS[sdk=iphonesimulator*]" = "$(BIT_SIM_ARCHS)";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
+				VERSION_STRING = 5.0.1;
 			};
 			name = ReleaseCrashOnly;
 		};
@@ -3260,6 +3264,7 @@
 				"VALID_ARCHS[sdk=iphonesimulator*]" = "$(BIT_SIM_ARCHS)";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
+				VERSION_STRING = 5.0.1;
 			};
 			name = Release;
 		};
