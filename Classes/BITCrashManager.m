@@ -205,6 +205,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
 @property (nonatomic, readwrite) BITCrashDetails *lastSessionCrashDetails;
 @property (nonatomic, readwrite) BOOL didCrashInLastSession;
 @property (nonatomic, readwrite) BOOL didReceiveMemoryWarningInLastSession;
+@property (nonatomic, readwrite) BOOL isLastCrashNonFatal;
 
 @end
 
@@ -228,6 +229,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
     _didCrashInLastSession = NO;
     _timeIntervalCrashInLastSessionOccurred = -1;
     _didLogLowMemoryWarning = NO;
+    _isLastCrashNonFatal = NO;
     
     _approvedCrashReports = [[NSMutableDictionary alloc] init];
 
@@ -1059,7 +1061,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
       
 #if !defined (HOCKEYSDK_CONFIGURATION_ReleaseCrashOnlyExtensions)
 
-    } else if (self.crashManagerStatus != BITCrashManagerStatusAutoSend && notApprovedReportFilename) {
+    } else if (!_isLastCrashNonFatal && self.crashManagerStatus != BITCrashManagerStatusAutoSend && notApprovedReportFilename) {
       id strongDelegate = self.delegate;
       if ([strongDelegate respondsToSelector:@selector(crashManagerWillShowSubmitCrashReportAlert:)]) {
         [strongDelegate crashManagerWillShowSubmitCrashReportAlert:self];
@@ -1145,6 +1147,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
 #endif /* !defined (HOCKEYSDK_CONFIGURATION_ReleaseCrashOnlyExtensions) */
       
     } else {
+      _isLastCrashNonFatal = NO;
       [self approveLatestCrashReport];
       [self sendNextCrashReport];
     }
@@ -1311,6 +1314,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
 
 - (void)sendNonFatalReportWithMessage:(NSString *)message
 {
+  _isLastCrashNonFatal = YES;
   [self createFakeCrashReportWithApplicationSpecificInformation:message];
   [self triggerDelayedProcessing];
 }
