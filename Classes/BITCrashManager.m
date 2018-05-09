@@ -1311,6 +1311,7 @@ __attribute__((noreturn)) static void uncaught_cxx_exception_handler(const BITCr
 
 - (void)sendNonFatalReportWithMessage:(NSString *)message
 {
+  [self appEnteredForeground];
   [self createFakeCrashReportWithApplicationSpecificInformation:message];
   [self triggerDelayedProcessing];
 }
