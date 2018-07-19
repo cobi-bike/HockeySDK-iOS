@@ -42,6 +42,7 @@
 
 #import "HockeySDKNullability.h"
 #import "BITHockeyHelper.h"
+#import "BITHockeyHelper+Application.h"
 #import "BITHockeyAppClient.h"
 
 #define kBITFeedbackUserDataAsked   @"HockeyFeedbackUserDataAsked"
@@ -131,7 +132,7 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
 - (void)didEnterBackgroundActions {
   self.didEnterBackgroundState = NO;
 
-  if ([[UIApplication sharedApplication] applicationState] == UIApplicationStateBackground) {
+  if ([BITHockeyHelper applicationState] == BITApplicationStateBackground) {
     self.didEnterBackgroundState = YES;
   }
 }
@@ -270,15 +271,16 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
   [self isiOS10PhotoPolicySet];
 
   // we are already delayed, so the notification already came in and this won't invoked twice
-  switch ([[UIApplication sharedApplication] applicationState]) {
-    case UIApplicationStateActive:
+  switch ([BITHockeyHelper applicationState]) {
+    case BITApplicationStateActive:
       // we did startup, so yes we are coming from background
       self.didEnterBackgroundState = YES;
 
       [self didBecomeActiveActions];
       break;
-    case UIApplicationStateBackground:
-    case UIApplicationStateInactive:
+    case BITApplicationStateBackground:
+    case BITApplicationStateInactive:
+    case BITApplicationStateUnknown:
       // do nothing, wait for active state
       break;
   }
@@ -832,41 +834,22 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
 
         if (self.showAlertOnIncomingMessages && !self.currentFeedbackListViewController && !self.currentFeedbackComposeViewController) {
           dispatch_async(dispatch_get_main_queue(), ^{
-              /*
-               // Requires iOS 8
-               id uialertcontrollerClass = NSClassFromString(@"UIAlertController");
-               if (uialertcontrollerClass) {
-               UIAlertController *alertController = [UIAlertController alertControllerWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageTitle")
-               message:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageText")
-               preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertController *alertController = [UIAlertController alertControllerWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageTitle")
+                                                                                     message:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageText")
+                                                                              preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackIgnore")
+                                                                   style:UIAlertActionStyleCancel
+                                                                 handler:nil];
+            UIAlertAction *showAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackShow")
+                                                                 style:UIAlertActionStyleDefault
+                                                               handler:^(UIAlertAction __unused * __nonnull action) {
+                                                                 [self showFeedbackListView];
+                                                               }];
+            [alertController addAction:cancelAction];
+            [alertController addAction:showAction];
 
-               UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackIgnore")
-               style:UIAlertActionStyleCancel
-               handler:nil];
-               UIAlertAction *showAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackShow")
-               style:UIAlertActionStyleDefault
-               handler:^(UIAlertAction *__nonnull action) {
-               [self showFeedbackListView];
-               }];
-               [alertController addAction:cancelAction];
-               [alertController addAction:showAction];
-
-               [self showAlertController:alertController];
-               } else {
-               */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-              UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageTitle")
-                                                                  message:BITHockeyLocalizedString(@"HockeyFeedbackNewMessageText")
-                                                                 delegate:self
-                                                        cancelButtonTitle:BITHockeyLocalizedString(@"HockeyFeedbackIgnore")
-                                                        otherButtonTitles:BITHockeyLocalizedString(@"HockeyFeedbackShow"), nil
-              ];
-              [alertView setTag:0];
-              [alertView show];
-#pragma clang diagnostic pop
-              /*}*/
-              self.incomingMessagesAlertShowing = YES;
+            [self showAlertController:alertController];
+            self.incomingMessagesAlertShowing = YES;
           });
         }
       }
@@ -1139,24 +1122,6 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
   [self submitPendingMessages];
 }
 
-
-#pragma mark - UIAlertViewDelegate
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-
-// invoke the selected action from the action sheet for a location element
-- (void)alertView:(UIAlertView *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex {
-
-  self.incomingMessagesAlertShowing = NO;
-  if (buttonIndex == [alertView firstOtherButtonIndex]) {
-    // Show button has been clicked
-    [self showFeedbackListView];
-  }
-}
-
-#pragma clang diagnostic pop
-
 #pragma mark - Observation Handling
 
 - (void)setFeedbackObservationMode:(BITFeedbackObservationMode)feedbackObservationMode {
@@ -1264,7 +1229,7 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
   [self fetchLatestImageUsingPhotoLibraryWithCompletionHandler:completionHandler];
 }
 
-- (void)fetchLatestImageUsingPhotoLibraryWithCompletionHandler:(BITLatestImageFetchCompletionBlock)completionHandler NS_AVAILABLE_IOS(8_0) {
+- (void)fetchLatestImageUsingPhotoLibraryWithCompletionHandler:(BITLatestImageFetchCompletionBlock)completionHandler {
   // Safeguard in case the dev hasn't set the NSPhotoLibraryUsageDescription in their Info.plist
   if (![self isiOS10PhotoPolicySet]) {return;}
 
@@ -1285,7 +1250,7 @@ typedef void (^BITLatestImageFetchCompletionBlock)(UIImage *_Nonnull latestImage
   }];
 }
 
-- (void)loadLatestImageAssetWithCompletionHandler:(BITLatestImageFetchCompletionBlock)completionHandler NS_AVAILABLE_IOS(8_0) {
+- (void)loadLatestImageAssetWithCompletionHandler:(BITLatestImageFetchCompletionBlock)completionHandler {
 
   // Safeguard in case the dev hasn't set the NSPhotoLibraryUsageDescription in their Info.plist
   if (![self isiOS10PhotoPolicySet]) {return;}

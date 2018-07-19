@@ -36,6 +36,7 @@
 #import "BITAuthenticationViewController.h"
 #import "BITHockeyAppClient.h"
 #import "BITHockeyHelper.h"
+#import "BITHockeyHelper+Application.h"
 #import "BITHockeyBaseManagerPrivate.h"
 
 #include <sys/stat.h>
@@ -105,12 +106,13 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
     [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(authenticateInstallation) object:nil];
     [self performSelector:@selector(authenticateInstallation) withObject:nil afterDelay:0.1];
   } else {
-    switch ([[UIApplication sharedApplication] applicationState]) {
-      case UIApplicationStateActive:
+    switch ([BITHockeyHelper applicationState]) {
+      case BITApplicationStateActive:
         [self authenticate];
         break;
-      case UIApplicationStateBackground:
-      case UIApplicationStateInactive:
+      case BITApplicationStateBackground:
+      case BITApplicationStateInactive:
+      case BITApplicationStateUnknown:
         // do nothing, wait for active state
         break;
     }
@@ -241,40 +243,20 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
         [self dismissAuthenticationControllerAnimated:YES completion:nil];
       } else {
         BITHockeyLogError(@"Validation failed with error: %@", error);
-        /* We won't use this for now until we have a more robust solution for displaying UIAlertController
-         // requires iOS 8
-         id uialertcontrollerClass = NSClassFromString(@"UIAlertController");
-         if (uialertcontrollerClass) {
-         __weak typeof(self) weakSelf = self;
-         
-         UIAlertController *alertController = [UIAlertController alertControllerWithTitle:nil
-         message:error.localizedDescription
-         preferredStyle:UIAlertControllerStyleAlert];
-         
-         
-         UIAlertAction *okAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyOK")
-         style:UIAlertActionStyleDefault
-         handler:^(UIAlertAction * action) {
-         typeof(self) strongSelf = weakSelf;
-         [strongSelf validate];
-         }];
-         
-         [alertController addAction:okAction];
-         
-         [self showAlertController:alertController];
-         } else {
-         */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-        UIAlertView *alertView = [[UIAlertView alloc] initWithTitle:nil
-                                                            message:error.localizedDescription
-                                                           delegate:self
-                                                  cancelButtonTitle:BITHockeyLocalizedString(@"HockeyOK")
-                                                  otherButtonTitles:nil];
-        [alertView setTag:0];
-        [alertView show];
-#pragma clang diagnostic pop
-        /*}*/
+        __weak typeof(self) weakSelf = self;
+
+        UIAlertController *alertController = [UIAlertController alertControllerWithTitle:nil
+                                                                                 message:error.localizedDescription
+                                                                          preferredStyle:UIAlertControllerStyleAlert];
+        UIAlertAction *okAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyOK")
+                                                           style:UIAlertActionStyleDefault
+                                                         handler:^(UIAlertAction __unused *action) {
+                                                           typeof(self) strongSelf = weakSelf;
+                                                           [strongSelf validate];
+                                                         }];
+
+        [alertController addAction:okAction];
+        [self showAlertController:alertController];
       }
     });
   }];
@@ -546,7 +528,7 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
   if (BITAuthenticatorIdentificationTypeHockeyAppUser == self.identificationType) {
     NSString *authStr = [NSString stringWithFormat:@"%@:%@", email, password];
     NSData *authData = [authStr dataUsingEncoding:NSUTF8StringEncoding];
-    NSString *authValue = [NSString stringWithFormat:@"Basic %@", bit_base64String(authData, authData.length)];
+    NSString *authValue = [NSString stringWithFormat:@"Basic %@", [authData base64EncodedStringWithOptions:0]];
     [request setValue:authValue forHTTPHeaderField:@"Authorization"];
   }
   
@@ -763,7 +745,7 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
 #pragma mark - Private helpers
 
 - (void)alertOnFailureStoringTokenInKeychain {
-  if ([[UIApplication sharedApplication] applicationState] != UIApplicationStateActive) {
+  if ([BITHockeyHelper applicationState] != BITApplicationStateActive) {
     return;
   }
   
@@ -776,6 +758,8 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
   [self removeKeyFromKeychain:kBITAuthenticatorUUIDKey];
   [self removeKeyFromKeychain:kBITAuthenticatorUserEmailKey];
   [self setLastAuthenticatedVersion:nil];
+  self.identified = NO;
+  self.validated = NO;
   
   //cleanup values stored from 3.5 Beta1..Beta3
   [self removeKeyFromKeychain:kBITAuthenticatorAuthTokenKey];
@@ -933,9 +917,6 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
   } else {
     [defaults setObject:lastAuthenticatedVersion
                  forKey:kBITAuthenticatorLastAuthenticatedVersionKey];
-    if(bit_isPreiOS8Environment()) {
-      [defaults synchronize];
-    }
   }
 }
 
@@ -1003,17 +984,6 @@ static unsigned char kBITPNGEndChunk[4] = {0x49, 0x45, 0x4e, 0x44};
     self.validated = NO;
   }
 }
-
-#pragma mark - UIAlertViewDelegate
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-- (void)alertView:(UIAlertView *)alertView didDismissWithButtonIndex:(NSInteger) __unused buttonIndex {
-  if (alertView.tag == 0) {
-    [self validate];
-  }
-}
-#pragma clang diagnostic pop
 
 @end
 

@@ -45,7 +45,6 @@
 #import "BITImageAnnotationViewController.h"
 #import "BITHockeyAttachment.h"
 
-
 @interface BITFeedbackComposeViewController () <BITFeedbackUserDataDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, UIActionSheetDelegate, BITImageAnnotationDelegate> {
 }
 
@@ -152,47 +151,32 @@
   NSDictionary* info = [aNotification userInfo];
   CGSize kbSize = [[info objectForKey:UIKeyboardFrameBeginUserInfoKey] CGRectValue].size;
   
-  BOOL isPortraitOrientation = NO;
-  
-#if __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_8_0
-  isPortraitOrientation = UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]);
-#else
-  isPortraitOrientation = UIInterfaceOrientationIsPortrait(self.interfaceOrientation);
-#endif
+  BOOL isPortraitOrientation = UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation]);
   
   CGRect frame = CGRectMake(0, 0, self.view.frame.size.width, self.view.frame.size.height);
   if (UI_USER_INTERFACE_IDIOM() != UIUserInterfaceIdiomPad) {
-    if (!bit_isPreiOS8Environment() || isPortraitOrientation) {
-      frame.size.height -= kbSize.height;
-    } else {
-      frame.size.height -= kbSize.width;
-    }
+    frame.size.height -= kbSize.height;
   } else {
     CGSize windowSize = [[UIScreen mainScreen] bounds].size;
     CGFloat windowHeight = windowSize.height - 20;
     CGFloat navBarHeight = self.navigationController.navigationBar.frame.size.height;
     
-    if (!bit_isPreiOS8Environment() || isPortraitOrientation) {
-      CGFloat modalGap = (windowHeight - self.view.bounds.size.height) / 2;
+    if (isPortraitOrientation) {
       frame.size.height = windowHeight - navBarHeight - kbSize.height;
-      if (bit_isPreiOS8Environment()) {
-        frame.size.height -= modalGap;
-      }
     } else {
-      windowHeight = windowSize.width - 20;
+      windowHeight = windowSize.height - 20;
       CGFloat modalGap = 0.0;
-      if (windowHeight - kbSize.width < self.view.bounds.size.height) {
+      if (windowHeight - kbSize.height < self.view.bounds.size.height) {
         modalGap = 30;
       } else {
         modalGap = (windowHeight - self.view.bounds.size.height) / 2;
       }
-      frame.size.height = windowSize.width - navBarHeight - modalGap - kbSize.width;
+      frame.size.height = windowSize.height - navBarHeight - modalGap - kbSize.height;
     }
   }
   [self.contentViewContainer setFrame:frame];
   
   [self performSelector:@selector(refreshAttachmentScrollview) withObject:nil afterDelay:0.0];
-  
 }
 
 - (void)keyboardWillBeHidden:(NSNotification*) __unused aNotification {
@@ -217,7 +201,7 @@
                                                                             style:UIBarButtonItemStyleDone
                                                                            target:self
                                                                            action:@selector(sendAction:)];
-  
+
   // Container that contains both the textfield and eventually the photo scroll view on the right side
   self.contentViewContainer = [[UIView alloc] initWithFrame:self.view.bounds];
   self.contentViewContainer.autoresizingMask = UIViewAutoresizingFlexibleWidth|UIViewAutoresizingFlexibleHeight;
@@ -239,7 +223,7 @@
   if([BITHockeyHelper isPhotoAccessPossible]) {
     self.textAccessoryView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, CGRectGetWidth(self.view.frame), 44)];
     self.textAccessoryView.backgroundColor = [UIColor colorWithRed:(CGFloat)0.9 green:(CGFloat)0.9 blue:(CGFloat)0.9 alpha:(CGFloat)1.0];
-  
+    
     self.addPhotoButton = [UIButton buttonWithType:UIButtonTypeCustom];
     [self.addPhotoButton setTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentAddImage") forState:UIControlStateNormal];
     [self.addPhotoButton setTitleColor:[UIColor darkGrayColor] forState:UIControlStateNormal];
@@ -262,7 +246,11 @@
   self.attachmentScrollView.bounces = YES;
   self.attachmentScrollView.autoresizesSubviews = NO;
   self.attachmentScrollView.autoresizingMask = UIViewAutoresizingFlexibleHeight|UIViewAutoresizingFlexibleRightMargin;
-  
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_11_0
+  if (@available(iOS 11.0, *)) {
+    self.attachmentScrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentAlways;
+  }
+#endif
   [self.contentViewContainer addSubview:self.attachmentScrollView];
 }
 
@@ -284,15 +272,7 @@
   }
   
   if (self.isStatusBarHiddenBeforeShowingPhotoPicker) {
-    // requires iOS 7
-    if ([self respondsToSelector:@selector(prefersStatusBarHidden)]) {
       [self setNeedsStatusBarAppearanceUpdate];
-    } else {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-      [[UIApplication sharedApplication] setStatusBarHidden:self.isStatusBarHiddenBeforeShowingPhotoPicker.boolValue];
-#pragma clang diagnostic pop
-    }
   }
   
   self.isStatusBarHiddenBeforeShowingPhotoPicker = nil;
@@ -543,64 +523,48 @@
   NSInteger index = [self.attachmentScrollViewImageViews indexOfObject:sender];
   
   self.selectedAttachmentIndex = (self.attachmentScrollViewImageViews.count - index - 1);
-  /* We won't use this for now until we have a more robust solution for displaying UIAlertController
-   // requires iOS 8
-   id uialertcontrollerClass = NSClassFromString(@"UIAlertController");
-   if (uialertcontrollerClass) {
-   __weak typeof(self) weakSelf = self;
-   
-   UIAlertController *alertController = [UIAlertController alertControllerWithTitle:nil
-   message:nil
-   preferredStyle:UIAlertControllerStyleActionSheet];
-   
-   
-   UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentCancel")
-   style:UIAlertActionStyleCancel
-   handler:^(UIAlertAction * action) {
-   typeof(self) strongSelf = weakSelf;
-   [strongSelf cancelAction];
-   _actionSheetVisible = NO;
-   }];
-   
-   [alertController addAction:cancelAction];
-   
-   UIAlertAction *editAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentEdit")
-   style:UIAlertActionStyleDefault
-   handler:^(UIAlertAction * action) {
-   typeof(self) strongSelf = weakSelf;
-   [strongSelf editAction];
-   _actionSheetVisible = NO;
-   }];
-   
-   [alertController addAction:editAction];
-   
-   UIAlertAction *deleteAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentDelete")
-   style:UIAlertActionStyleDestructive
-   handler:^(UIAlertAction * action) {
-   typeof(self) strongSelf = weakSelf;
-   [strongSelf deleteAction];
-   _actionSheetVisible = NO;
-   }];
-   
-   [alertController addAction:deleteAction];
-   
-   [self presentViewController:alertController animated:YES completion:nil];
-   } else {
-   */
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  UIActionSheet *actionSheet = [[UIActionSheet alloc] initWithTitle: nil
-                                                           delegate: self
-                                                  cancelButtonTitle: BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentCancel")
-                                             destructiveButtonTitle: BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentDelete")
-                                                  otherButtonTitles: BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentEdit"), nil];
   
-  [actionSheet showFromRect: sender.frame inView: self.attachmentScrollView animated: YES];
-#pragma clang diagnostic push
-  /*}*/
+  __weak typeof(self) weakSelf = self;
+  
+  UIAlertController *alertController = [UIAlertController alertControllerWithTitle:nil
+                                                                           message:nil
+                                                                    preferredStyle:UIAlertControllerStyleActionSheet];
+  
+  
+  UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentCancel")
+                                                         style:UIAlertActionStyleCancel
+                                                       handler:^(UIAlertAction __unused *action) {
+                                                         typeof(self) strongSelf = weakSelf;
+                                                         [strongSelf cancelAction];
+                                                         strongSelf.actionSheetVisible = NO;
+                                                       }];
+  
+  [alertController addAction:cancelAction];
+  
+  UIAlertAction *editAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentEdit")
+                                                       style:UIAlertActionStyleDefault
+                                                     handler:^(UIAlertAction __unused *action) {
+                                                       typeof(self) strongSelf = weakSelf;
+                                                       [strongSelf editAction];
+                                                       strongSelf.actionSheetVisible = NO;
+                                                     }];
+  
+  [alertController addAction:editAction];
+  
+  UIAlertAction *deleteAction = [UIAlertAction actionWithTitle:BITHockeyLocalizedString(@"HockeyFeedbackComposeAttachmentDelete")
+                                                         style:UIAlertActionStyleDestructive
+                                                       handler:^(UIAlertAction __unused *action) {
+                                                         typeof(self) strongSelf = weakSelf;
+                                                         [strongSelf deleteAction];
+                                                         strongSelf.actionSheetVisible = NO;
+                                                       }];
+  
+  [alertController addAction:deleteAction];
+  
+  [self presentViewController:alertController animated:YES completion:nil];
   
   self.actionSheetVisible = YES;
-  if ((UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) || ([[NSProcessInfo processInfo] respondsToSelector:@selector(isOperatingSystemAtLeastVersion:)] && [[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){9,0,0}])) {
+  if ((UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) || ([[NSProcessInfo processInfo] isOperatingSystemAtLeastVersion:(NSOperatingSystemVersion){9,0,0}])) {
     [self.textView resignFirstResponder];
   }
 }
